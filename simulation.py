@@ -21,7 +21,7 @@ class AP:
         self.turtle.color(AP_color_codes[index])
         self.turtle.penup()
         self.turtle.shape("square" if (isWifi) else "triangle")
-        self.turtle.speed(0)
+        self.turtle.speed(6)
         self.turtle.goto(position[0],position[1])
 
 class User:
@@ -50,7 +50,7 @@ w_AP5=AP([0,0],4,isWifi=True)
 aps=[l_AP1,l_AP2,l_AP3,l_AP4,w_AP5]
 
 users=[]
-user_1=User([-100,0],hostAP=w_AP5,speed=1)
+user_1=User([-100,0],hostAP=w_AP5,speed=2)
 user_2=User([80,0],hostAP=w_AP5,speed=2)
 user_3=User([-100,-200],hostAP=w_AP5,speed=3)
 users=[user_1,user_2,user_3]
@@ -58,8 +58,8 @@ users=[user_1,user_2,user_3]
 for user in users:
     for ap in aps:
         user_pos=[user.turtle.xcor(),user.turtle.ycor()]
-        og_dist=euclidieanDistance(user_pos,user.hostAP.position)
-        new_dist=euclidieanDistance(user_pos,ap.position)
+        og_dist=euclidieanDistance(user_pos,user.hostAP.turtle.pos())
+        new_dist=euclidieanDistance(user_pos,ap.turtle.pos())
         if og_dist>new_dist:
             user.hostAP=ap
             user.turtle.color(ap.turtle.color()[0])
@@ -80,17 +80,19 @@ def drawPerimeter():
 
 
 def signalStrength(pos1,pos2):
-    return euclidieanDistance(pos1,pos2)**-1
+    if(euclidieanDistance(pos1,pos2)==0): return 1000
+    else:
+        return euclidieanDistance(pos1,pos2)**-1
 
 def SINR(tx_ap,user):
     # SINR between two positions
     user_pos=user.turtle.pos()
-    signal=signalStrength(tx_ap.position,user_pos)
+    signal=signalStrength(tx_ap.turtle.pos(),user_pos)
     interference=0
     for ap in aps:
         if ap.index==tx_ap.index:
             continue
-        interference+=signalStrength(ap.position,user_pos)
+        interference+=signalStrength(ap.turtle.pos(),user_pos)
     noise=0
     return signal/(interference+noise)
 
@@ -108,6 +110,28 @@ def wallBounceCheck(user):
 def objectiveFunction(ap,user):
     return SINR(ap,user) + (SINR(ap,user) - SINR(ap,user))/ttt
 
+def moveAP(ap,targetPos):
+    DX=targetPos[0]-ap.turtle.xcor()-20
+    DY=targetPos[1]-ap.turtle.ycor()-20
+    steps=700 #inversely proportional to speed
+    ctr=0
+    while(ctr<steps):
+        wn.update()
+        ap.turtle.setx(ap.turtle.xcor()+(DX/steps))
+        ap.turtle.sety(ap.turtle.ycor()+(DY/steps))
+        
+        if ap.turtle.xcor() > 300: ap.turtle.setx(300) 
+        if ap.turtle.xcor() < -300: ap.turtle.setx(-300)
+
+        if ap.turtle.ycor() > 300: ap.turtle.sety(300) 
+        if ap.turtle.ycor() < -300: ap.turtle.sety(-300)
+
+        ctr+=1
+        # keep users moving while we move AP
+        for _user in users:
+            _user.turtle.setx(_user.turtle.xcor()+_user.turtle.dx)
+            _user.turtle.sety(_user.turtle.ycor()+_user.turtle.dy)
+            wallBounceCheck(_user)
 t=0
 while True:
     wn.update()
@@ -148,12 +172,30 @@ while True:
                         #find targetAP
                         objFuncVals=[objectiveFunction(_ap,user) for _ap in aps]
                         targetAP=aps[objFuncVals.index(max(objFuncVals))]
-
-                        # see whether to handover to this targetAP or move targetAP
                         print("Need to see handover or move AP")
+                        # see whether to handover to this targetAP or move targetAP
+
+                        # find position for AP(moving candidate) which would give an new_gamma>=handover_candidate_gamma+threshold (threshold should be >0 because otherwise if users moves by even a samll unit, it will again very likely find a better AP)
+
+                        # this is the position within an imaginary circle with user as center and radius as distance between user and handover_candidate
+                        # the position is that point on this circle which is closest to all other Users connected to the original_AP
+                        
+                        # is this new position causing other Users to have an SINR lower than some threshold? -> then do handover instead
+                        # is this new position causing original_AP to move some distance d>d_max? -> then do handover instead
+                        # if all is good, move the AP to new position and repeat steps.
+
                         print("ap.index",targetAP.index)
-                        user.hostAP=ap
-                        user.turtle.color(ap.turtle.color()[0])
+                        
+                        choiceVar=random.choice([-1, 1])
+                        # choiceVar=1
+                        
+                        if choiceVar==1:
+                            # Move AP
+                            moveAP(user.hostAP,user.turtle.pos())
+                        else:
+                            # Handover
+                            user.hostAP=targetAP
+                            user.turtle.color(ap.turtle.color()[0])
                     else:
                         # do nothing
                         print("False Alarm, AP_candidate didnt pass ttt test")
@@ -166,6 +208,9 @@ while True:
         # wall bounce
         wallBounceCheck(user)
     t+=1
+
+
+
 
 
 
