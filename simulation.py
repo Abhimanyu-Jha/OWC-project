@@ -10,11 +10,14 @@ wn.bgcolor("black")
 wn.title("User Simulation")
 AP_color_codes = ["red", "yellow", "green", "blue",
                   "orange", "purple", "pink", "white", "black"]
-speedFactor = 0.03
+speedFactor = 0.025
 ttt = 1000
 hom = 0.001
 wn.tracer(0)
 static_demo = False
+t = 0
+simulationTime = 10000
+TOTAL_HANDOVERS = 0
 
 
 class AP:
@@ -64,11 +67,11 @@ user_3 = User([0, 200], hostAP=w_AP5, speed=1)
 user_4 = User([0, -200], hostAP=w_AP5, speed=1)
 user_5 = User([300, 0], hostAP=w_AP5, speed=1)
 user_6 = User([-300, 0], hostAP=w_AP5, speed=1)
-user_7 = User([0, -300], hostAP=w_AP5, speed=1)
+# user_7 = User([0, -300], hostAP=w_AP5, speed=1)
 # users = [user_1, user_2, user_3]
-users = [user_1, user_2, user_3, user_4, user_5, user_6, user_7]
+users = [user_1, user_2, user_3, user_4, user_5, user_6]
 # check closest AP, set as hostAP
-for user in users[0:1]:
+for user in users:
     for ap in aps:
         user_pos = [user.turtle.xcor(), user.turtle.ycor()]
         og_dist = euclidieanDistance(user_pos, user.hostAP.turtle.pos())
@@ -142,7 +145,6 @@ def getOptimalPoint(center, radius, existing_users, currPos, d_max=600, wifi=Tru
         for user in existing_users:
             new_SINR = hypothetical_SINR(
                 [x, y], user.hostAP.index, user.turtle.pos())
-            print("new SINR is", new_SINR)
             if new_SINR < min_SINR:
                 flag = False
                 break
@@ -155,10 +157,6 @@ def getOptimalPoint(center, radius, existing_users, currPos, d_max=600, wifi=Tru
                 optimalSumSINR = sumSINR
 
     return optimalPoint
-
-
-# draw perimeter
-drawPerimeter()
 
 
 def wallBounceCheck(user):
@@ -196,19 +194,21 @@ def moveAP(ap, targetPos):
 
         ctr += 1
         # keep users moving while we move AP
-        for _user in users[0:1]:
+        for _user in users:
             _user.turtle.setx(_user.turtle.xcor()+_user.turtle.dx)
             _user.turtle.sety(_user.turtle.ycor()+_user.turtle.dy)
             wallBounceCheck(_user)
 
 
-t = 0
+# draw perimeter
+drawPerimeter()
 
-while True:
+while t < simulationTime:
+    if(t == simulationTime-1):
+        print("TOTAL HANDOVERS = ", TOTAL_HANDOVERS)
+    print(t)
     wn.update()
-    for user in users[0:1]:
-        print("Hyphothetical SINR for user", hypothetical_SINR(
-            user.hostAP.turtle.pos(), user.hostAP.index, user.turtle.pos()))
+    for user in users:
         # move users acc to their speeds
         user.turtle.setx(user.turtle.xcor()+user.turtle.dx)
         user.turtle.sety(user.turtle.ycor()+user.turtle.dy)
@@ -236,7 +236,7 @@ while True:
                         if not(SINR(ap, user) >= SINR_host + hom):
                             makeDecision = False
                             break
-                        for _user in users[0:1]:
+                        for _user in users:
                             # keep users moving while we evaluate ttt
                             _user.turtle.setx(
                                 _user.turtle.xcor()+_user.turtle.dx)
@@ -263,7 +263,7 @@ while True:
                             targetAP.turtle.pos(), user_pos)
 
                         host_AP_users = [
-                            _user for _user in users[0:1] if _user.hostAP.index == user.hostAP.index]
+                            _user for _user in users if _user.hostAP.index == user.hostAP.index]
                         optimal_host_AP_position = getOptimalPoint(center=user.turtle.pos(), radius=dist_from_target_AP,
                                                                    existing_users=host_AP_users, currPos=user.hostAP.turtle.pos())
                         if(static_demo):
@@ -277,6 +277,7 @@ while True:
                             # Handover
                             user.hostAP = targetAP
                             user.turtle.color(ap.turtle.color()[0])
+                            TOTAL_HANDOVERS += 1
                         else:
                             # Move AP
                             print("Moving AP to", optimal_host_AP_position)
@@ -287,7 +288,7 @@ while True:
                         print("False Alarm, AP_candidate didnt pass ttt test")
 
         # random direction change every 3s (interval)
-        if(t % 3000 == 0):
+        if(t % 1500 == 0):
             user.turtle.dx *= random.choice([-1, 1])
             user.turtle.dy *= random.choice([-1, 1])
 
