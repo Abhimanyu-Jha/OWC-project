@@ -10,10 +10,11 @@ wn.bgcolor("black")
 wn.title("User Simulation")
 AP_color_codes = ["red", "yellow", "green", "blue",
                   "orange", "purple", "pink", "white", "black"]
-speedFactor = 0.01
+speedFactor = 0.03
 ttt = 1000
 hom = 0.001
 wn.tracer(0)
+static_demo = False
 
 
 class AP:
@@ -29,7 +30,7 @@ class AP:
 
 
 class User:
-    def __init__(self, position, hostAP, speed):
+    def __init__(self, position, hostAP, speed=0.02):
         self.position = position
         self.hostAP = hostAP
         self.speed = speed
@@ -57,12 +58,17 @@ w_AP5 = AP([0, 0], 4, isWifi=True)
 aps = [l_AP1, l_AP2, l_AP3, l_AP4, w_AP5]
 
 users = []
-user_1 = User([-100, 0], hostAP=w_AP5, speed=2)
-user_2 = User([80, 0], hostAP=w_AP5, speed=2)
-user_3 = User([-100, -200], hostAP=w_AP5, speed=3)
-users = [user_1, user_2, user_3]
+user_1 = User([-200, 0], hostAP=w_AP5, speed=1)
+user_2 = User([200, 0], hostAP=w_AP5, speed=1)
+user_3 = User([0, 200], hostAP=w_AP5, speed=1)
+user_4 = User([0, -200], hostAP=w_AP5, speed=1)
+user_5 = User([300, 0], hostAP=w_AP5, speed=1)
+user_6 = User([-300, 0], hostAP=w_AP5, speed=1)
+user_7 = User([0, -300], hostAP=w_AP5, speed=1)
+# users = [user_1, user_2, user_3]
+users = [user_1, user_2, user_3, user_4, user_5, user_6, user_7]
 # check closest AP, set as hostAP
-for user in users:
+for user in users[0:1]:
     for ap in aps:
         user_pos = [user.turtle.xcor(), user.turtle.ycor()]
         og_dist = euclidieanDistance(user_pos, user.hostAP.turtle.pos())
@@ -94,6 +100,17 @@ def signalStrength(pos1, pos2):
         return euclidieanDistance(pos1, pos2)**-1
 
 
+def hypothetical_SINR(ap_pos, ap_index, user_pos):
+    signal = signalStrength(ap_pos, user_pos)
+    interference = 0
+    for ap in aps:
+        if ap.index == ap_index:
+            continue
+        interference += signalStrength(ap.turtle.pos(), user_pos)
+    noise = 0
+    return signal/(interference+noise)
+
+
 def SINR(tx_ap, user):
     # SINR between two positions
     user_pos = user.turtle.pos()
@@ -107,7 +124,7 @@ def SINR(tx_ap, user):
     return signal/(interference+noise)
 
 
-def getOptimalPoint(center, radius, existing_users, currPos, d_max=200, wifi=True, radius_step_size=5, angle_step_size=10, min_SINR=0.5):
+def getOptimalPoint(center, radius, existing_users, currPos, d_max=600, wifi=True, radius_step_size=5, angle_step_size=10, min_SINR=0.2):
     # existing_users is a list of users connected to that AP which we are considering to move
     coords = []
     for r in np.arange(0, radius + radius_step_size/2, radius_step_size):
@@ -120,17 +137,17 @@ def getOptimalPoint(center, radius, existing_users, currPos, d_max=200, wifi=Tru
     optimalPoint = None
     optimalSumSINR = None
     for (x, y) in coords:
-        newAP = AP([x, y], 5, isWifi=wifi)
         sumSINR = 0
         flag = True
         for user in existing_users:
-            new_SINR = SINR(newAP, user)
+            new_SINR = hypothetical_SINR(
+                [x, y], user.hostAP.index, user.turtle.pos())
+            print("new SINR is", new_SINR)
             if new_SINR < min_SINR:
                 flag = False
                 break
             else:
                 sumSINR += new_SINR
-        newAP.turtle.hideturtle()
 
         if flag:
             if (optimalSumSINR is None) or (sumSINR > optimalSumSINR):
@@ -179,7 +196,7 @@ def moveAP(ap, targetPos):
 
         ctr += 1
         # keep users moving while we move AP
-        for _user in users:
+        for _user in users[0:1]:
             _user.turtle.setx(_user.turtle.xcor()+_user.turtle.dx)
             _user.turtle.sety(_user.turtle.ycor()+_user.turtle.dy)
             wallBounceCheck(_user)
@@ -189,7 +206,9 @@ t = 0
 
 while True:
     wn.update()
-    for user in users:
+    for user in users[0:1]:
+        print("Hyphothetical SINR for user", hypothetical_SINR(
+            user.hostAP.turtle.pos(), user.hostAP.index, user.turtle.pos()))
         # move users acc to their speeds
         user.turtle.setx(user.turtle.xcor()+user.turtle.dx)
         user.turtle.sety(user.turtle.ycor()+user.turtle.dy)
@@ -210,13 +229,14 @@ while True:
                     tc = 0
 
                     while(tc < ttt):
+                        wn.update()
+                        # print(tc)
                         if tc == 1:
                             print("ttt counter started")
                         if not(SINR(ap, user) >= SINR_host + hom):
                             makeDecision = False
                             break
-                        wn.update()
-                        for _user in users:
+                        for _user in users[0:1]:
                             # keep users moving while we evaluate ttt
                             _user.turtle.setx(
                                 _user.turtle.xcor()+_user.turtle.dx)
@@ -241,14 +261,13 @@ while True:
                         # the position is that point on this circle which is closest to all other Users connected to the original_AP
                         dist_from_target_AP = euclidieanDistance(
                             targetAP.turtle.pos(), user_pos)
-                        # dist_from_host_AP = euclidieanDistance(
-                        #     user.hostAP.turtle.pos(), user_pos)
 
                         host_AP_users = [
-                            _user for _user in users if _user.hostAP.index == user.hostAP.index]
+                            _user for _user in users[0:1] if _user.hostAP.index == user.hostAP.index]
                         optimal_host_AP_position = getOptimalPoint(center=user.turtle.pos(), radius=dist_from_target_AP,
                                                                    existing_users=host_AP_users, currPos=user.hostAP.turtle.pos())
-
+                        if(static_demo):
+                            optimal_host_AP_position = None
                         # is this new position causing other Users to have an SINR lower than some threshold? -> then do handover instead
                         # is this new position causing original_AP to move some distance d>d_max? -> then do handover instead
                         # if all is good, move the AP to new position and repeat steps.
