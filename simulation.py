@@ -24,7 +24,7 @@ class AP:
         self.turtle.color(AP_color_codes[index])
         self.turtle.penup()
         self.turtle.shape("square" if (isWifi) else "triangle")
-        self.turtle.speed(6)
+        self.turtle.speed(0)
         self.turtle.goto(position[0], position[1])
 
 
@@ -107,7 +107,7 @@ def SINR(tx_ap, user):
     return signal/(interference+noise)
 
 
-def getOptimalPoint(center, radius, existing_users, currPos, d_max=200, wifi=True, radius_step_size=5, angle_step_size=10, min_SINR=0.1):
+def getOptimalPoint(center, radius, existing_users, currPos, d_max=200, wifi=True, radius_step_size=5, angle_step_size=10, min_SINR=0.5):
     # existing_users is a list of users connected to that AP which we are considering to move
     coords = []
     for r in np.arange(0, radius + radius_step_size/2, radius_step_size):
@@ -120,16 +120,17 @@ def getOptimalPoint(center, radius, existing_users, currPos, d_max=200, wifi=Tru
     optimalPoint = None
     optimalSumSINR = None
     for (x, y) in coords:
-        newAp = AP([x, y], -1, isWifi=wifi)
+        newAP = AP([x, y], 5, isWifi=wifi)
         sumSINR = 0
         flag = True
         for user in existing_users:
-            new_SINR = SINR(newAp, user)
+            new_SINR = SINR(newAP, user)
             if new_SINR < min_SINR:
                 flag = False
                 break
             else:
                 sumSINR += new_SINR
+        newAP.turtle.hideturtle()
 
         if flag:
             if (optimalSumSINR is None) or (sumSINR > optimalSumSINR):
@@ -209,7 +210,8 @@ while True:
                     tc = 0
 
                     while(tc < ttt):
-                        print(tc)
+                        if tc == 1:
+                            print("ttt counter started")
                         if not(SINR(ap, user) >= SINR_host + hom):
                             makeDecision = False
                             break
@@ -229,6 +231,8 @@ while True:
                             _ap, user) for _ap in aps]
                         targetAP = aps[objFuncVals.index(max(objFuncVals))]
                         print("Need to see handover or move AP")
+                        print("ap.index", targetAP.index)
+
                         # see whether to handover to this targetAP or move hostAP
 
                         # find position for AP(moving candidate) which would give an new_gamma>=handover_candidate_gamma+threshold (threshold should be >0 because otherwise if users moves by even a samll unit, it will again very likely find a better AP)
@@ -237,28 +241,28 @@ while True:
                         # the position is that point on this circle which is closest to all other Users connected to the original_AP
                         dist_from_target_AP = euclidieanDistance(
                             targetAP.turtle.pos(), user_pos)
-                        dist_from_host_AP = euclidieanDistance(
-                            user.hostAP.turtle.pos(), user_pos)
+                        # dist_from_host_AP = euclidieanDistance(
+                        #     user.hostAP.turtle.pos(), user_pos)
+
                         host_AP_users = [
                             _user for _user in users if _user.hostAP.index == user.hostAP.index]
-                        getOptimalPoint(center=user.turtle.pos(), radius=dist_from_target_AP,
-                                        existing_users=host_AP_users, currPos=user.hostAP.turtle.pos())
+                        optimal_host_AP_position = getOptimalPoint(center=user.turtle.pos(), radius=dist_from_target_AP,
+                                                                   existing_users=host_AP_users, currPos=user.hostAP.turtle.pos())
+
                         # is this new position causing other Users to have an SINR lower than some threshold? -> then do handover instead
                         # is this new position causing original_AP to move some distance d>d_max? -> then do handover instead
                         # if all is good, move the AP to new position and repeat steps.
-
-                        print("ap.index", targetAP.index)
-
-                        choiceVar = random.choice([-1, 1])
-                        # choiceVar=1
-
-                        if choiceVar == 1:
-                            # Move AP
-                            moveAP(user.hostAP, user.turtle.pos())
-                        else:
+                        # optimal_host_AP_position = [100, 0]
+                        if(optimal_host_AP_position is None):
+                            print("Moving AP is not feasible")
                             # Handover
                             user.hostAP = targetAP
                             user.turtle.color(ap.turtle.color()[0])
+                        else:
+                            # Move AP
+                            print("Moving AP to", optimal_host_AP_position)
+                            moveAP(user.hostAP, optimal_host_AP_position)
+
                     else:
                         # do nothing
                         print("False Alarm, AP_candidate didnt pass ttt test")
