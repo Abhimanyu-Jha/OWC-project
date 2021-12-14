@@ -14,7 +14,7 @@ speedFactor = 0.025
 ttt = 1000
 hom = 0.001
 wn.tracer(0)
-static_demo = False
+static_demo = True
 t = 0
 simulationTime = 10000
 TOTAL_HANDOVERS = 0
@@ -127,7 +127,7 @@ def SINR(tx_ap, user):
     return signal/(interference+noise)
 
 
-def getOptimalPoint(center, radius, existing_users, currPos, d_max=600, wifi=True, radius_step_size=5, angle_step_size=10, min_SINR=0.2):
+def getOptimalPoint(center, radius, existing_users, currPos, d_max=200, wifi=True, radius_step_size=5, angle_step_size=10, min_SINR=0.2):
     # existing_users is a list of users connected to that AP which we are considering to move
     coords = []
     for r in np.arange(0, radius + radius_step_size/2, radius_step_size):
